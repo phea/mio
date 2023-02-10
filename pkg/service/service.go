@@ -11,14 +11,26 @@
 
 package service
 
+import "net/http"
+
+var specs = []Spec{}
+
+type Vars map[string]string
+
 type Service interface {
-	// Send sends a message.
-	Send(title, body string) error
-	// Route returns the service route.
-	Route() string
+	// Init initializes the service with the given Service Options.
+	Init(route string, vars Vars, opts ...Option) error
+	// Parse parses the route.
+	Send(title, body string) (*http.Response, error)
 }
 
 type Spec struct {
 	Template []string
 	Init     func() Service
 }
+
+func Specs() []Spec {
+	return specs
+}
+
+type Option func(Service)
