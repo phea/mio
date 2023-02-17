@@ -14,7 +14,6 @@ package mio
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"sync"
 
 	"github.com/phea/mio/internal/matcher"
@@ -86,38 +85,27 @@ func (n *Notifier) Must(route string, opts ...service.Option) {
 }
 
 type broadCastResult struct {
-	serviceName string
-	resp        http.Response // could be change to a buffer or []byte slice
-	err         error
+	err error
 }
 
 // Broadcast asynchronously sends a message to all registered services.
 func (n *Notifier) Broadcast(title, body string) {
-	// create a channel to receive results from goroutines
 	results := make(chan broadCastResult, len(n.svcs))
-	// create a wait group to wait for all goroutines to finish
 	var wg sync.WaitGroup
-	// add the number of goroutines to wait for
 	wg.Add(len(n.svcs))
-	// iterate over all registered services
 	for _, svc := range n.svcs {
-		// create a goroutine for each service
 		go func(svc service.Service) {
-			// send the result to the channel
-			resp, err := svc.Send(title, body)
+			err := svc.Send(title, body)
 			results <- broadCastResult{
 				// serviceName: svc.Route(),
-				resp: *resp,
-				err:  err,
+				err: err,
 			}
-			// decrement the wait group
 			wg.Done()
 		}(svc)
 	}
 
 	// wait for all goroutines to finish
 	wg.Wait()
-	// close the channel
 	close(results)
 
 	// we can do something with the results here

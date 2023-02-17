@@ -11,8 +11,6 @@
 
 package service
 
-import "net/http"
-
 var specs = []Spec{}
 
 type Vars map[string]string
@@ -21,7 +19,7 @@ type Service interface {
 	// Init initializes the service with the given Service Options.
 	Init(route string, vars Vars, opts ...Option) error
 	// Parse parses the route.
-	Send(title, body string) (*http.Response, error)
+	Send(title, body string) error
 }
 
 type Spec struct {
@@ -34,3 +32,9 @@ func Specs() []Spec {
 }
 
 type Option func(Service)
+
+func SetTLS(isTLS bool) Option {
+	return func(s Service) {
+		s.(*ServiceJSON).isTLS = isTLS
+	}
+}

@@ -12,6 +12,9 @@
 package service
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -19,11 +22,12 @@ import (
 )
 
 var jsonTemplates = []string{
-	"json://",
+	"json://{host}",
 	"json://{host}:{port}",
+	"json://{user}@{host}",
 	"json://{user}@{host}:{port}",
-	"json://{user}:{password}@{host}",
-	"json://{user}:{password}@{host}:{port}",
+	"json://{user}:{pass}@{host}",
+	"json://{user}:{pass}@{host}:{port}",
 }
 
 func init() {
@@ -35,7 +39,6 @@ var _ Service = (*ServiceJSON)(nil)
 
 type ServiceJSON struct {
 	method   string
-	port     int
 	scheme   string
 	url      url.URL
 	isTLS    bool
@@ -47,17 +50,16 @@ func jsonSpec() Spec {
 	return Spec{
 		Template: jsonTemplates,
 		Init: func() Service {
-			return defaultJsonService()
+			return defaultJSONService()
 		},
 	}
 }
 
-func defaultJsonService() *ServiceJSON {
+func defaultJSONService() *ServiceJSON {
 	return &ServiceJSON{
 		method: "POST",
 		scheme: "json",
-		port:   80,
-		isTLS:  false,
+		isTLS:  true,
 	}
 }
 
@@ -67,29 +69,40 @@ func (s *ServiceJSON) Init(route string, vars Vars, opts ...Option) error {
 		opt(s)
 	}
 	s.rawRoute = route
+	s.vars = vars
 
-	fmt.Println(vars)
 	return nil
 }
 
 // Send sends a JSON message.
-func (s *ServiceJSON) Send(title, body string) (*http.Response, error) {
-	fmt.Printf("JSON: %s - %s\n", title, body)
+func (s *ServiceJSON) Send(title, body string) error {
+	data, err := json.Marshal(map[string]string{
+		"title": title,
+		"body":  body,
+	})
 
-	// client := http.DefaultClient
-	// req, err := http.NewRequestWithContext(context.Background(),
-	// 	s.method, s.URL(), nil)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	if err != nil {
+		return err
+	}
 
-	// client.Do(req)
-	fmt.Printf("Making request to %s, Method: %s\n", s.URL(), s.method)
-	return &http.Response{}, nil
+	// create a io.Reader from data
+	reader := bytes.NewReader(data)
+
+	client := http.DefaultClient
+	req, err := http.NewRequestWithContext(context.Background(),
+		s.method, s.endpoint(), reader)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	client.Do(req)
+	return nil
 }
 
 // URL returns the URL for the http request.
-func (s *ServiceJSON) URL() string {
+func (s *ServiceJSON) endpoint() string {
 	url, err := url.Parse(s.rawRoute)
 	if err != nil {
 		return ""
@@ -110,9 +123,9 @@ func (s *ServiceJSON) URL() string {
 	}
 
 	sb.WriteString(url.Hostname())
-	if s.port != 80 {
+	if url.Port() != "" {
 		sb.WriteString(":")
-		sb.WriteString(fmt.Sprintf("%d", s.port))
+		sb.WriteString(fmt.Sprintf("%s", url.Port()))
 	}
 	sb.WriteString(url.Path)
 
