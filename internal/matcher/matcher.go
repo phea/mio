@@ -31,9 +31,18 @@ func New(tmpl string) *Matcher {
 		panic(err)
 	}
 
-	idents := regex.SubexpNames()
+	var idents []string
+	// loop through the subexpressions and add them to the idents if they
+	// are not empty
+	for _, name := range regex.SubexpNames() {
+		if name != "" {
+			idents = append(idents, name)
+		}
+	}
 
-	return &Matcher{regex: regex, idents: idents}
+	// extract the scheme from the template
+	scheme := strings.Split(tmpl, "://")[0]
+	return &Matcher{regex: regex, scheme: scheme, idents: idents}
 }
 
 // IsMatch takes a route string and checks if it matches the
@@ -45,15 +54,22 @@ func (m *Matcher) IsMatch(route string) bool {
 // Vars takes a route string and returns a map of the variables
 // in the route.
 func (m *Matcher) Vars(route string) map[string]string {
-	matches := m.regex.FindStringSubmatch(route)
 	vars := make(map[string]string)
-	for i, match := range matches {
-		if i != 0 {
-			vars[m.idents[i]] = match
+	// given a route string, extract the values for each of the idents
+	matches := m.regex.FindStringSubmatch(route)
+
+	// loop through subexpressions and add them to the vars if name
+	// is not empty
+	for i, name := range m.regex.SubexpNames() {
+		if name != "" && i <= len(matches) {
+			vars[name] = matches[i]
 		}
 	}
 	return vars
 }
+
+// regex string for valid hostname including ip4 and ip6 addresses
+var hostRegex = `(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9]))`
 
 // newTmplRegex takes a template string and returns a regexp.Regexp
 // used to match the route to a service template.
@@ -80,9 +96,17 @@ func newTmplRegex(tmpl string) (*regexp.Regexp, error) {
 		if i == start {
 			// if the current index is the start of a brace
 			// write the regex for the variable
-			b.WriteString(`(?P<`)
-			b.WriteString(tmpl[start+1 : end])
-			b.WriteString(`>[\w]+)`)
+			id := tmpl[start+1 : end]
+			b.WriteString(`(?P`)
+			b.WriteString("<" + id + ">")
+			if id == "host" {
+				b.WriteString(hostRegex)
+			} else {
+				b.WriteString(`[\w]+)`)
+			}
+
+			// add the length of the brace to the current index
+			i += end - start
 			// update the start and end indices
 			if curIdx < len(idxs) {
 				start = idxs[curIdx]
@@ -90,8 +114,6 @@ func newTmplRegex(tmpl string) (*regexp.Regexp, error) {
 				curIdx += 2
 			}
 
-			// add the length of the brace to the current index
-			i += end - start
 		} else if tmpl[i] == '/' {
 			b.WriteString("\\/")
 		} else {
@@ -99,6 +121,9 @@ func newTmplRegex(tmpl string) (*regexp.Regexp, error) {
 			b.WriteByte(tmpl[i])
 		}
 	}
+
+	b.WriteString(".*")
+	fmt.Println(b.String())
 	return regexp.Compile(b.String())
 }
 
