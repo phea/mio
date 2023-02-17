@@ -12,14 +12,18 @@
 package service
 
 import (
-	"fmt"
+	"bytes"
+	"context"
+	"encoding/xml"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 var xmlTemplates = []string{
-	"xml://",
+	"xml://{host}",
 	"xml://{host}:{port}",
+	"xml://{user}@{host}",
 	"xml://{user}@{host}:{port}",
 	"xml://{user}:{password}@{host}",
 	"xml://{user}:{password}@{host}:{port}",
@@ -34,10 +38,8 @@ var _ Service = (*ServiceXML)(nil)
 
 type ServiceXML struct {
 	method   string
-	port     string
 	scheme   string
 	rawRoute string
-	url      *url.URL
 	isTLS    bool
 	vars     Vars // this should probably be a Field struct
 }
@@ -55,8 +57,7 @@ func defaultXMLService() *ServiceXML {
 	return &ServiceXML{
 		scheme: "xml",
 		method: "POST",
-		port:   "80",
-		isTLS:  false,
+		isTLS:  true,
 	}
 }
 
@@ -70,32 +71,75 @@ func (s *ServiceXML) Init(route string, vars Vars, opts ...Option) error {
 	return nil
 }
 
-// Parse parses the route and fills in the ServiceXML struct.
-func (s *ServiceXML) Parse(route string) error {
-	s.rawRoute = route
-	u, err := url.Parse(route)
-	if err != nil {
-		return err
-	}
-	s.url = u
-	s.scheme = u.Scheme
-	if u.Port() != "" {
-		s.port = u.Port()
-	}
-	if u.User != nil {
-		s.vars["user"] = u.User.Username()
-		s.vars["password"], _ = u.User.Password()
-	}
-	return nil
+type xmlPayload struct {
+	Title   string
+	Body    string
+	XMLName xml.Name `xml:"Payload"`
 }
 
 // Send sends a XML message.
-func (s *ServiceXML) Send(title, body string) (*http.Response, error) {
-	fmt.Printf("XML: %s - %s", title, body)
-	return &http.Response{}, nil
+func (s *ServiceXML) Send(title, body string) error {
+	payload := &xmlPayload{Title: title, Body: body}
+	data, err := xml.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	reader := bytes.NewReader(data)
+	client := http.DefaultClient
+	req, err := http.NewRequestWithContext(context.Background(),
+		s.method, s.Endpoint(), reader)
+	if err != nil {
+		return err
+	}
+
+	// set xml headers
+	req.Header.Set("Content-Type", "application/xml")
+	_, err = client.Do(req)
+	return err
 }
 
-// URL returns the URL for the service http request call.
-func (s *ServiceXML) URL() string {
-	return ""
+// Endpoint returns the endpoint URL for the http request.
+func (s *ServiceXML) Endpoint() string {
+	url, err := url.Parse(s.rawRoute)
+	if err != nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	// if isTLS is true, use https, otherwise use http
+	if s.isTLS {
+		sb.WriteString("https://")
+	} else {
+		sb.WriteString("http://")
+	}
+
+	// if user is not empty, append it to the endpoint
+	if url.User != nil {
+		sb.WriteString(url.User.String())
+		sb.WriteString("@")
+	}
+
+	sb.WriteString(url.Hostname())
+	if url.Port() != "" {
+		sb.WriteString(":")
+		sb.WriteString(url.Port())
+	}
+	sb.WriteString(url.Path)
+
+	return sb.String()
+}
+
+// SetOption sets the option for the service.
+func (s *ServiceXML) SetOption(key string, value interface{}) {
+	switch key {
+	case "method":
+		s.method = value.(string)
+	case "scheme":
+		s.scheme = value.(string)
+	case "isTLS":
+		s.isTLS = value.(bool)
+	default:
+		s.vars[key] = value.(string)
+	}
 }
