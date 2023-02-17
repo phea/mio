@@ -2,8 +2,10 @@ package service
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/phea/mio/internal/matcher"
@@ -81,17 +83,11 @@ func TestJSONInit(t *testing.T) {
 
 // TestJSONSend tests the JSON service send.
 func TestJSONSend(t *testing.T) {
-	svc := defaultJSONService()
-	svc.Init("json://test:pass@localhost:8080/abc/def", nil, SetTLS(false))
-
 	// create a test server to handle the request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("intercepted request")
 		if r.Method != "POST" {
 			t.Errorf("expected method to be POST, got %s", r.Method)
-		}
-
-		if r.URL.Host != "localhost:8080" {
-			t.Errorf("expected host to be localhost:8080, got %s", r.URL.Host)
 		}
 
 		if r.URL.Path != "/abc/def" {
@@ -114,12 +110,15 @@ func TestJSONSend(t *testing.T) {
 			t.Errorf("expected title to be title, got %s", data["title"])
 		}
 
-		if data["message"] != "message" {
+		if data["body"] != "message" {
 			t.Errorf("expected message to be message, got %s", data["message"])
 		}
 	}))
 	defer ts.Close()
 
+	route := "json://" + strings.TrimPrefix(ts.URL, "http://") + "/abc/def"
+	svc := defaultJSONService()
+	svc.Init(route, nil, SetTLS(false))
 	err := svc.Send("title", "message")
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)

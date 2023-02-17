@@ -20,6 +20,8 @@ type Service interface {
 	Init(route string, vars Vars, opts ...Option) error
 	// Parse parses the route.
 	Send(title, body string) error
+	// SetOption sets the option for the service.
+	SetOption(key string, value interface{})
 }
 
 type Spec struct {
@@ -35,6 +37,6 @@ type Option func(Service)
 
 func SetTLS(isTLS bool) Option {
 	return func(s Service) {
-		s.(*ServiceJSON).isTLS = isTLS
+		s.SetOption("isTLS", isTLS)
 	}
 }

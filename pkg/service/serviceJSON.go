@@ -40,7 +40,6 @@ var _ Service = (*ServiceJSON)(nil)
 type ServiceJSON struct {
 	method   string
 	scheme   string
-	url      url.URL
 	isTLS    bool
 	rawRoute string
 	vars     Vars // this should probably be a Field struct
@@ -90,19 +89,19 @@ func (s *ServiceJSON) Send(title, body string) error {
 
 	client := http.DefaultClient
 	req, err := http.NewRequestWithContext(context.Background(),
-		s.method, s.endpoint(), reader)
+		s.method, s.Endpoint(), reader)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	client.Do(req)
-	return nil
+	_, err = client.Do(req)
+	return err
 }
 
-// URL returns the URL for the http request.
-func (s *ServiceJSON) endpoint() string {
+// Endpoint returns the endpoint URL for the http request.
+func (s *ServiceJSON) Endpoint() string {
 	url, err := url.Parse(s.rawRoute)
 	if err != nil {
 		return ""
@@ -130,4 +129,18 @@ func (s *ServiceJSON) endpoint() string {
 	sb.WriteString(url.Path)
 
 	return sb.String()
+}
+
+// SetOption sets options for the service.
+func (s *ServiceJSON) SetOption(key string, value interface{}) {
+	switch key {
+	case "method":
+		s.method = value.(string)
+	case "scheme":
+		s.scheme = value.(string)
+	case "isTLS":
+		s.isTLS = value.(bool)
+	default:
+		s.vars[key] = value.(string)
+	}
 }
