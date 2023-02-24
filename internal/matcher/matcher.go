@@ -13,6 +13,7 @@ package matcher
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -53,7 +54,7 @@ func (m *Matcher) IsMatch(route string) bool {
 
 // Vars takes a route string and returns a map of the variables
 // in the route.
-func (m *Matcher) Vars(route string) map[string]string {
+func (m *Matcher) Vars(route string) (map[string]string, error) {
 	vars := make(map[string]string)
 	// given a route string, extract the values for each of the idents
 	matches := m.regex.FindStringSubmatch(route)
@@ -65,7 +66,18 @@ func (m *Matcher) Vars(route string) map[string]string {
 			vars[name] = matches[i]
 		}
 	}
-	return vars
+
+	// Parse the route and add query params to vars.
+	uri, err := url.Parse(route)
+	if err != nil {
+		return nil, err
+	}
+
+	q := uri.Query()
+	for k, v := range q {
+		vars[k] = v[0]
+	}
+	return vars, nil
 }
 
 // regex string for valid hostname including ip4 and ip6 addresses
@@ -123,7 +135,6 @@ func newTmplRegex(tmpl string) (*regexp.Regexp, error) {
 	}
 
 	b.WriteString(".*")
-	fmt.Println(b.String())
 	return regexp.Compile(b.String())
 }
 

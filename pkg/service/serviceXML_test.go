@@ -51,9 +51,12 @@ func TestXMLTemplate(t *testing.T) {
 func TestXMLInit(t *testing.T) {
 	svc := defaultXMLService()
 	m := matcher.New("xml://{user}:{pass}@{host}:{port}")
-	mVars := m.Vars("xml://test:pass@localhost:8080/abc/def")
+	mVars, err := m.Vars("xml://test:pass@localhost:8080/abc/def")
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 
-	err := svc.Init("xml://test:pass@localhost:8080/abc/def", mVars, SetTLS(false))
+	err = svc.Init("xml://test:pass@localhost:8080/abc/def", mVars, SetTLS(false))
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}

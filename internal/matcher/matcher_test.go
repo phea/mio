@@ -87,16 +87,20 @@ func TestVars(t *testing.T) {
 		vars  map[string]string
 	}{
 		{"https://example.com/path1/path2", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2"}},
-		{"https://example.com/path1/path2?query=string", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2"}},
-		{"https://example.com/path1/path2?query=string#fragment", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2"}},
-		{"https://example.com/path1/path2?query=string#fragment?query=string", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2"}},
+		{"https://example.com/path1/path2?query=string", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2", "query": "string"}},
+		{"https://example.com/path1/path2?query=string#fragment", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2", "query": "string"}},
+		{"https://example.com/path1/path2?query=string#fragment?query=string", map[string]string{"host": "example.com", "path1": "path1", "path2": "path2", "query": "string"}},
 		{"https://example/path1/path2", map[string]string{"host": "example", "path1": "path1", "path2": "path2"}},
 		{"https://example/path1/path2/path3", map[string]string{"host": "example", "path1": "path1", "path2": "path2"}},
 		{"http://example.com/path1/path2", map[string]string{}},
 	}
 
 	for _, test := range tests {
-		vars := m.Vars(test.route)
+		vars, err := m.Vars(test.route)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+
 		if len(vars) != len(test.vars) {
 			t.Errorf("expected %v variables, got %v", len(test.vars), len(vars))
 		}

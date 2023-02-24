@@ -52,9 +52,12 @@ func TestJSONTemplate(t *testing.T) {
 func TestJSONInit(t *testing.T) {
 	svc := defaultJSONService()
 	m := matcher.New("json://{user}:{pass}@{host}:{port}")
-	mVars := m.Vars("json://test:pass@localhost:8080/abc/def")
+	mVars, err := m.Vars("json://test:pass@localhost:8080/abc/def")
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 
-	err := svc.Init("json://test:pass@localhost:8080/abc/def", mVars, SetTLS(false))
+	err = svc.Init("json://test:pass@localhost:8080/abc/def", mVars, SetTLS(false))
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}

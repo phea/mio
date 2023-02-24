@@ -60,8 +60,12 @@ func (n *Notifier) Add(route string, opts ...service.Option) error {
 	var svc service.Service
 	for _, m := range serviceMatchers {
 		if m.matcher.IsMatch(route) {
-			vars := m.matcher.Vars(route)
-			err := m.service.Init(route, vars, opts...)
+			vars, err := m.matcher.Vars(route)
+			if err != nil {
+				return err
+			}
+
+			err = m.service.Init(route, vars, opts...)
 			if err != nil {
 				return err
 			}
